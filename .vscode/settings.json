@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "multiproc.h": "c",
+        "process_pool.h": "c"
+    }
+}
