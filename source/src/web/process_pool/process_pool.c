@@ -2,9 +2,8 @@
 
 void* execute_in_process(pid_t work_pid, void* (*func)(void*), void *args){
 	// wraps process target
-	// IT IS COMPLETELY RIGHT YOU MORRON
 	if (getpid() == work_pid){
-		void* res = (*func)(args);
+		void* res = (*func)((int*)args);
         
 		return res;
 	}
@@ -62,9 +61,16 @@ void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args) {
 }
 
 
-ProcessPipe* create_process_pipe(ProcessPipe* pipes, unsigned idx) 
-{
-    
+typedef struct {
+    ProcessPipe* pipes;
+    int idx;
+} PipeArgs;
+
+
+ProcessPipe* create_process_pipe(PipeArgs* args) {
+    PipeArgs* arguments = (PipeArgs*)args;
+    ProcessPipe* pipes = arguments->pipes;
+    int idx = arguments->idx;
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         perror("pipe creation failed");
@@ -74,11 +80,12 @@ ProcessPipe* create_process_pipe(ProcessPipe* pipes, unsigned idx)
     ProcessPipe cur_pipe = {
         pipefd[0], pipefd[1], 0
     };
-    
-    create_subprocess(&cur_pipe);
-    
+    if (idx < 0 || idx >= 3) {
+        fprintf(stderr, "Index out of bounds\n");
+        return NULL;
+    }
     pipes[idx] = cur_pipe;
-    
+    create_subprocess(&cur_pipe);    
     return &cur_pipe;
 }
 
@@ -86,12 +93,21 @@ ProcessPipe* create_process_pipe(ProcessPipe* pipes, unsigned idx)
 ProcessPool create_process_pool(unsigned process_count) {
     pid_t main_pid = getpid();
     ProcessPipe* pipes = (ProcessPipe*) malloc(sizeof(ProcessPipe) * process_count);
+
+    if (!pipes) {
+        fprintf(stderr, "Failed to allocate memory for pipes\n");
+        exit(-1);
+    }
+
     unsigned *idle_processes =  (unsigned*) malloc(sizeof(unsigned) * process_count);
     pthread_t *ready_listeners = (pthread_t*) malloc(sizeof(pthread_t) * process_count);
     ProcessPool pool = {main_pid, process_count, pipes, idle_processes, ready_listeners};
     for(int i = 0; i < process_count; i++) {
-        void *args = {pipes, i};
+        PipeArgs* args = malloc(sizeof(PipeArgs));  // Allocate memory for the arguments
+        args->pipes = pipes;
+        args->idx = i;
         execute_in_process(main_pid, create_process_pipe, args);
+        free(args);  // Free the allocated memory
     }
     return pool;
 }
