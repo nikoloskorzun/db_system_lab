@@ -1,6 +1,0 @@
-
-struct main_process
-{
-    
-};
-
