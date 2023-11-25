@@ -9,6 +9,7 @@
 #include <math.h>
 #include "../process_pool/process_pool.h"
 #include <pthread.h>
+#include <string.h>
 
 void serve_forever(ProcessPool* process_pool);
 #endif

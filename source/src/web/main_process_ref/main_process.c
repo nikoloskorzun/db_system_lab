@@ -1,28 +1,43 @@
 #include "main_process.h"
 
-typedef struct {
+typedef struct 
+{
 	size_t content_len;
 	unsigned status_code;
 	char* data;
 } response;
 
-typedef struct {
+typedef struct 
+{
 	unsigned content_len;
 	void* data;
 } request;
 
-int* endpoint_logic(request* req, int* answer_len, int* answer) {
-	int cur_len = 0;
-    int* data = (int*) req->data;
-    int num_ints = req->content_len / sizeof(int);
-    for (int i = 0; i < num_ints - 1; i++) {
-        char *command = (char*) req->data;
-        printf("%s", command);
-    }
-    *answer_len = cur_len;
+void log_info(char* msg) 
+{
+   FILE *log_file = fopen("out.log", "a+");
+   if (log_file == NULL) {
+       printf("Error opening file!\n");
+       return;
+   }
+   fprintf(log_file, "%s\n", msg);
+   fclose(log_file);
 }
 
-response do_work(request* req) {
+
+int* endpoint_logic(request* req, int* answer_len, char* answer) 
+{
+	int cur_len = 6;
+    int* data = (int*) req->data;
+    char *command = (char*) req->data;
+    log_info("Command obtained");
+    answer = "Hello";
+    log_info("Endpoint logic completed");
+    *answer_len = strlen(answer);
+}
+
+response do_work(request* req) 
+{
 	if(req->data != NULL) {
 		int* result_len = malloc(sizeof(int));
 		int* result = malloc(100);
@@ -34,7 +49,8 @@ response do_work(request* req) {
 	return resp;
 }
 
-request receive_data(int sock) {
+request receive_data(int sock) 
+{
 	float* buf = malloc(sizeof(float)*3);
 	int bytes_read;
 	unsigned content_length;
@@ -44,39 +60,49 @@ request receive_data(int sock) {
 	return received;
 }
 
-void respond(int sock, response *resp, int len, int flags) {
+void respond(int sock, response *resp, int len, int flags) 
+{
 	send(sock, &resp->content_len, sizeof(unsigned), 0);
 	send(sock, &resp->status_code, sizeof(unsigned), 0);
 	send(sock, (void*)resp->data, resp->content_len - sizeof(unsigned)*2, 0);
 }
 
 
-void request_handle(sock) {
+void request_handle(sock) 
+{
     
     if(sock < 0){
         perror("accept");
         exit(3);
     }
 	request received_request = receive_data(sock);
+    log_info("New request received");
 	response resp = do_work(&received_request);
+    log_info("Work done");
 	respond(sock, &resp, resp.content_len, 0);
 	free(received_request.data);
     printf("DONE");
 }
 
 
-void accept_ready(int listener, ProcessPool* process_pool){
+void accept_ready(int listener, ProcessPool* process_pool)
+{
     int sock;
 	while(1)
     {
+        log_info("ACCEPTING");
         sock = accept(listener, NULL, NULL);
-        void *args = {sock};
+        int *args = (int*)(malloc(sizeof(sock)));
+        args[0] = sock;
+        log_info("New accept");
         apply_async(process_pool, request_handle, args);
+        log_info("Job applied");
 	}
 	close(sock);
 }
 
-void serve_forever(ProcessPool* process_pool) {
+void serve_forever(ProcessPool* process_pool) 
+{
 	int listener;
     struct sockaddr_in addr;
     int bytes_read;
