@@ -3,8 +3,7 @@
 void* execute_in_process(pid_t work_pid, void* (*func)(void*), void *args){
 	// wraps process target
 	if (getpid() == work_pid){
-		void* res = (*func)((int*)args);
-        
+		void* res = (*func)(args);
 		return res;
 	}
 	return NULL;
@@ -19,12 +18,21 @@ void create_subprocess(ProcessPipe* pipe_holder) {
 
 void listen_to_process_ready(ProcessPipe* p_pipe, unsigned* process_queue, int idx) {
     char* work_info = (char*) malloc(sizeof(char) * 128);
-    while(work_info != "DONE") {
+    if (!work_info) {
+        perror("malloc failed");
+        return;
+    }
+    wait_for(3);
+
+    while (1) {
         log_info1("Start scanning");
-        fscanf(p_pipe->output, "%s", work_info);
-        printf("[%u] - %s", p_pipe->sub_process_pid, work_info);
+        if (fscanf(p_pipe->output, "%127s", work_info) != 1) {
+            perror("fscanf failed or end of file reached");
+            break;
+        }
     }
     process_queue[idx] = 1;
+    free(work_info); // Free the allocated memory
 }
 
 void wait_for (unsigned int secs) {
@@ -43,6 +51,14 @@ void log_info1(char* msg)
    fprintf(log_file, "%s\n", msg);
    fclose(log_file);
 }
+
+
+typedef struct {
+    ProcessPool* ppool;
+    void* (*func)(void*);
+    void* args;
+    int occupied_pos;
+} AsyncArgs;
 
 
 void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args) {
@@ -65,14 +81,13 @@ void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args) {
     pthread_t thread_id;
     ppool->idle_processes[occupied_pos] = 0;
     int rc = pthread_create(&thread_id, NULL, listen_to_process_ready, ppool->idle_processes, occupied_pos);
-    int* result;
     log_info("New thread started");    
     log_info1("Idle filled");
+
     execute_in_process(free_communication->sub_process_pid, func, args);
     log_info1("Executed task");
     ppool->ready_listeners[occupied_pos] = thread_id;
     log_info1("Listener occupied");
-    pthread_join(thread_id, result);
 }
 
 

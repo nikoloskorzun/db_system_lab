@@ -68,8 +68,10 @@ void respond(int sock, response *resp, int len, int flags)
 }
 
 
-void request_handle(sock) 
-{
+void request_handle(void* arg) {
+    log_info("New request_handle");
+    int sock = *((int*)arg);
+    free(arg); // Free the allocated memory for args
     
     if(sock < 0){
         perror("accept");
@@ -85,20 +87,29 @@ void request_handle(sock)
 }
 
 
-void accept_ready(int listener, ProcessPool* process_pool)
-{
-    int sock;
-	while(1)
-    {
+void accept_ready(int listener, ProcessPool* process_pool) {
+    while (1) {
         log_info("ACCEPTING");
-        sock = accept(listener, NULL, NULL);
-        int *args = (int*)(malloc(sizeof(sock)));
+        int sock = accept(listener, NULL, NULL);
+        if (sock < 0) {
+            perror("accept failed");
+            continue; // Or handle the error as needed
+        }
+
+        int* args = (int*)malloc(sizeof(sock));
+        if (!args) {
+            perror("malloc failed");
+            close(sock);
+            continue;
+        }
+
         args[0] = sock;
         log_info("New accept");
         apply_async(process_pool, request_handle, args);
         log_info("Job applied");
-	}
-	close(sock);
+        // Consideration: close(sock) here might be too early depending on apply_async implementation
+    }
+    // No need for close(sock) here as it's inside the loop
 }
 
 void serve_forever(ProcessPool* process_pool) 
