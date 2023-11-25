@@ -61,14 +61,15 @@ void request_handle(sock) {
 	response resp = do_work(&received_request);
 	respond(sock, &resp, resp.content_len, 0);
 	free(received_request.data);
-    printf('DONE');
+    printf("DONE");
 }
 
 
 void accept_ready(int listener, ProcessPool* process_pool){
+    int sock;
 	while(1)
     {
-        int sock = accept(listener, NULL, NULL);
+        sock = accept(listener, NULL, NULL);
         void *args = {sock};
         apply_async(process_pool, request_handle, args);
 	}
@@ -80,6 +81,7 @@ void serve_forever(ProcessPool* process_pool) {
     struct sockaddr_in addr;
     int bytes_read;
     listener = socket(AF_INET, SOCK_STREAM, 0);
+    
     if(listener < 0)
     {
         perror("s:socket");

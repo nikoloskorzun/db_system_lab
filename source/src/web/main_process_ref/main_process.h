@@ -1,3 +1,5 @@
+#ifndef __MAIN__PROCESS__H
+#define __MAIN__PROCESS__H
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -9,3 +11,4 @@
 #include <pthread.h>
 
 void serve_forever(ProcessPool* process_pool);
+#endif

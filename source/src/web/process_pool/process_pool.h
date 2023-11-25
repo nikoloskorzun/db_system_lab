@@ -1,3 +1,5 @@
+#ifndef __PROCESS__POOL__H
+#define __PROCESS__POOL__H
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -8,20 +10,21 @@
 #include <time.h>
 
 void* execute_in_process(pid_t work_pid, void* (*func)(void*), void *args);
-typedef struct ProcessPipe
+typedef struct
 {
     FILE *input;
     FILE *output;
     pid_t sub_process_pid;
-};
+} ProcessPipe;
 
-typedef struct ProcessPool
+typedef struct
 {
     unsigned main_pid;
     unsigned process_count;  // 
     ProcessPipe* pipes;  // all pipes
     unsigned *idle_processes;  // [0, 1, 1, 0, 0] where index(0) - occupied process in pipes, 1 - free process
     pthread_t *ready_listeners;
-};
+} ProcessPool;
 ProcessPool create_process_pool(unsigned process_count);
-void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args)
+void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args);
+#endif

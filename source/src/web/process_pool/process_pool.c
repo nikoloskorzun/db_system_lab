@@ -1,20 +1,15 @@
 #include "process_pool.h"
 
-
-
 void* execute_in_process(pid_t work_pid, void* (*func)(void*), void *args){
 	// wraps process target
 	// IT IS COMPLETELY RIGHT YOU MORRON
 	if (getpid() == work_pid){
-
 		void* res = (*func)(args);
+        
 		return res;
 	}
 	return NULL;
 }
-
-
-
 
 void create_subprocess(ProcessPipe* pipe_holder) {
     void *dup_args = {pipe_holder->output, STDOUT_FILENO};
@@ -40,20 +35,27 @@ void wait_for (unsigned int secs) {
 }
 
 void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args) {
-    ProcessPipe* free_communication;
-    int occupied_pos;
-    for (int i=0; i < ppool->process_count; i++) {
+    ProcessPipe* free_communication = NULL;
+    int occupied_pos = -1;
+    for (int i = 0; i < ppool->process_count; i++) {
         if(ppool->idle_processes[i]) {
             free_communication = &ppool->pipes[i];
             occupied_pos = i;
+            break; // Added break to exit the loop once a free communication is found
         }
     }
+
     if (!free_communication) {
         wait_for(0.05);
         return apply_async(ppool, func, args);
     }
+
     pthread_t thread_id;
-    pthread_create(&thread_id, listen_to_process_ready, free_communication);
+    int rc = pthread_create(&thread_id, NULL, listen_to_process_ready, free_communication);
+    if (rc) {
+        // Handle pthread_create error
+        return;
+    }
     ppool->idle_processes[occupied_pos] = 0;
     execute_in_process(free_communication->sub_process_pid, func, args);
     ppool->ready_listeners[occupied_pos] = thread_id;
@@ -62,16 +64,21 @@ void apply_async(ProcessPool* ppool, void* (*func)(void*), void *args) {
 
 ProcessPipe* create_process_pipe(ProcessPipe* pipes, unsigned idx) 
 {
+    
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         perror("pipe creation failed");
         exit(-1);
     };
+    
     ProcessPipe cur_pipe = {
         pipefd[0], pipefd[1], 0
     };
+    
     create_subprocess(&cur_pipe);
+    
     pipes[idx] = cur_pipe;
+    
     return &cur_pipe;
 }
 
@@ -84,9 +91,7 @@ ProcessPool create_process_pool(unsigned process_count) {
     ProcessPool pool = {main_pid, process_count, pipes, idle_processes, ready_listeners};
     for(int i = 0; i < process_count; i++) {
         void *args = {pipes, i};
-        ProcessPipe new_process = *(
-            (ProcessPipe*) execute_in_process(main_pid, create_process_pipe, args)
-        ); // get comm primitive
-        
+        execute_in_process(main_pid, create_process_pipe, args);
     }
+    return pool;
 }
